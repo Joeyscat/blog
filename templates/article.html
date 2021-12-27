@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+<div>
+    <a href="/article/edit?id={{id}}">编辑</a>
+    <h1>{{ title }}</h1>
+
+    <p>{{ author }} 发表于 {{ created_time }}</p>
+    <div>
+        {{ content }}
+    </div>
+</div>
+{% endblock %}

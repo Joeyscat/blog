@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+<div class="body-content">
+    <h3>
+        {{ title }}
+    </h3>
+    <form class="" action="/article/publish" method="post">
+        <input type="text" name="title" placeholder="这里输入标题">
+        <br>
+        <input type="text" name="tags" placeholder="这里输入标签 以英文逗号分隔">
+        <br>
+        <textarea name="raw_content" placeholder="这里输入内容" autofocus></textarea>
+        <br>
+        <input type="submit" value="发布">
+    </form>
+</div>
+{% endblock content %}

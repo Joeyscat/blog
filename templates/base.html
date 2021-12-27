@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title }}{% endblock %}</title>
+</head>
+
+<body>
+    <div class="header">
+        <h1>JOEYSCAT</h1>
+        <a href="/">主页</a>
+        <a href="/article/publish">发布新文章</a>
+    </div>
+    <hr>
+
+    <div id="content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <hr>
+    <div class="footer">
+        Powerd by JoJo
+    </div>
+</body>
+
+</html>
