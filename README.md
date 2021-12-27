@@ -3,37 +3,37 @@
 ## API
 
 ### 登录页面
-`GET` /login
+`GET` /signin
 
 ### 注册页面
-`GET` /register
+`GET` /signup
 
 ### 登录
-`POST` /login
+`POST` /signin
 
 ### 注册
-`POST` /register
+`POST` /signup
 
 ### 发布文章页面
-`GET` /create
+`GET` /article/publish
 
 ### 发布文章
-`POST` /create
+`POST` /article/publish
 
 ### 删除文章页面
-`GET` /delete
+`GET` /article/delete
 
 ### 发布文章
-`POST` /delete
+`POST` /article/delete
 
 ### 修改文章页面
-`GET` /modify
+`GET` /article/edit
 
 ### 修改文章
-`POST` /modify
+`POST` /article/edit
 
-### 文章列表
-`GET` /list
+### 首页/文章列表
+`GET` /
 
 ### 文章详情
 `GET` /article
