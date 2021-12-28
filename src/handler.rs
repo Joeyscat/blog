@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use askama::Template;
+use markdown;
 use poem::{
     handler,
     http::{header, StatusCode},
@@ -105,6 +106,7 @@ pub struct ArticleTemplate {
     pub author: String,
     pub created_time: String,
     pub content: String,
+    pub tags: String,
 }
 
 #[derive(Template)]
@@ -164,12 +166,15 @@ pub async fn article_details(
 
     match article_r {
         Ok(article) => {
+            let content = markdown::to_html(article.raw_content.as_str());
+
             let tpl = ArticleTemplate {
                 id: article.id.to_string(),
-                title: article.title.to_string(),
+                title: article.title,
                 author: article.author_id.to_string(),
                 created_time: article.created_time.to_string(),
-                content: article.raw_content.to_string(),
+                tags: article.tags,
+                content: content,
             };
 
             Html(tpl.render().unwrap()).into_response()

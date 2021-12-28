@@ -2,13 +2,21 @@
 
 
 {% block content %}
-<div>
-    <a href="/article/edit?id={{id}}">编辑</a>
-    <h1>{{ title }}</h1>
+<div class="body-content article_detail detail">
+    <div class="article_detail_head">
+        <a href="/article/edit?id={{id}}">编辑</a>
 
-    <p>{{ author }} 发表于 {{ created_time }}</p>
-    <div>
-        {{ content }}
+        <div class="title">
+            <h2>
+                <a href="/article?id={{id}}">{{title}}</a>
+            </h2>
+        </div>
+        <p>{{author}} 发表于 {{created_time}}</p>
+        <p>
+            <small>Tags: {{tags}}</small>
+        </p>
     </div>
+
+    <div class="detail-body">{{content|escape("html")}}</div>
 </div>
 {% endblock %}

@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div>
+<div class="body-content">
+    <div class="action_area">
+        <a class="right new-article" href="/article/publish">发布新文章</a>
+    </div>
+
     {% for article in article_list %}
     <li>
-        <a href="/article?id={{ article.id }}">{{ article.title }}</a>
+        <a href="/article?id={{ article.id }}">{{article.title}}</a>
     </li>
     {% endfor %}
 </div>

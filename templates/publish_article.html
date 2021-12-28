@@ -4,12 +4,12 @@
 {% block content %}
 <div class="body-content">
     <h3>
-        {{ title }}
+        {{title}}
     </h3>
     <form class="" action="/article/publish" method="post">
-        <input type="text" name="title" placeholder="这里输入标题">
+        <input type="text" class="input" name="title" placeholder="这里输入标题">
         <br>
-        <input type="text" name="tags" placeholder="这里输入标签 以英文逗号分隔">
+        <input type="text" class="input" name="tags" placeholder="这里输入标签 以英文逗号分隔">
         <br>
         <textarea name="raw_content" placeholder="这里输入内容" autofocus></textarea>
         <br>
