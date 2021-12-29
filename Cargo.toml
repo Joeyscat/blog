@@ -8,13 +8,18 @@ edition = "2021"
 [dependencies]
 poem = { version = "1", features = ["session"] }
 serde = { version = "1", features = ["derive"] }
+serde_derive = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing-subscriber = "0.2"
 tracing = "0.1"
-sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "postgres", "uuid", "chrono"  ] }
-askama = { version = "0.11" }
-askama_escape = "0.10"
-serde_derive = "1"
+sqlx = { version = "0.5", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
-chrono = {features = ["serde"], version = "0.4"}
+chrono = { features = ["serde"], version = "0.4" }
 markdown = "0.3"
+tera = { version = "1" }
+lazy_static = {version = "*"}

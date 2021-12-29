@@ -4,19 +4,19 @@
 {% block content %}
 <div class="body-content article_detail detail">
     <div class="article_detail_head">
-        <a href="/article/edit?id={{id}}">编辑</a>
+        <a href="/article/edit?id={{article.id}}">编辑</a>
 
         <div class="title">
             <h2>
-                <a href="/article?id={{id}}">{{title}}</a>
+                <a href="/article?id={{article.id}}">{{article.title}}</a>
             </h2>
         </div>
-        <p>{{author}} 发表于 {{created_time}}</p>
+        <p>{{article.author_id}} 发表于 {{article.created_time}}</p>
         <p>
-            <small>Tags: {{tags}}</small>
+            <small>Tags: {{article.tags}}</small>
         </p>
     </div>
 
-    <div class="detail-body">{{content|escape("html")}}</div>
+    <div class="detail-body">{{article.raw_content|safe}}</div>
 </div>
 {% endblock %}

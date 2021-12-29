@@ -7,12 +7,12 @@
         写文章
     </h3>
     <form class="" action="/article/edit" method="post">
-        <input type="hidden" name="id" value="{{ id }}">
-        <input type="text" name="title" value="{{ title }}" placeholder="这里输入标题">
+        <input type="hidden" name="id" value="{{ article.id }}">
+        <input type="text" name="title" value="{{ article.title }}" placeholder="这里输入标题">
         <br>
-        <input type="text" name="tags" value="{{ tags }}" placeholder="这里输入标签 以英文逗号分隔">
+        <input type="text" name="tags" value="{{ article.tags }}" placeholder="这里输入标签 以英文逗号分隔">
         <br>
-        <textarea name="raw_content" placeholder="这里输入内容" autofocus>{{content}}</textarea>
+        <textarea name="raw_content" placeholder="这里输入内容" autofocus>{{article.raw_content}}</textarea>
         <br>
         <input type="submit" value="发布">
     </form>

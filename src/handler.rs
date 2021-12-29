@@ -1,7 +1,4 @@
-use std::str::FromStr;
-
-use askama::Template;
-use markdown;
+use lazy_static::lazy_static;
 use poem::{
     handler,
     http::{header, StatusCode},
@@ -10,11 +7,29 @@ use poem::{
     IntoResponse, Response,
 };
 use serde::Deserialize;
+use std::str::FromStr;
+use tera::{Context, Tera};
+use markdown;
 
 use crate::DBPool;
 
 use crate::db;
 use crate::model::Article;
+
+lazy_static! {
+    pub static ref TEMPLATES: Tera = {
+        let mut tera = match Tera::new("templates/**/*") {
+            Ok(t) => t,
+            Err(e) => {
+                println!("Parsing error(s): {}", e);
+                ::std::process::exit(1);
+            }
+        };
+        tera.autoescape_on(vec!["html", ".sql"]);
+        // tera.register_filter("do_nothing", do_nothing_filter);
+        tera
+    };
+}
 
 #[handler]
 pub fn signin_ui() -> impl IntoResponse {
@@ -78,72 +93,24 @@ pub fn logout(session: &Session) -> impl IntoResponse {
         .finish()
 }
 
-#[derive(Template)]
-#[template(path = "404.html")]
-pub struct NotFoundTemplate {
-    pub title: String,
-}
-
-#[derive(Template)]
-#[template(path = "error.html")]
-pub struct ErrorTemplate {
-    pub title: String,
-    pub msg: String,
-}
-
-#[derive(Template)]
-#[template(path = "index.html")]
-pub struct IndexTemplate {
-    pub title: String,
-    pub article_list: Vec<Article>,
-}
-
-#[derive(Template)]
-#[template(path = "article.html")]
-pub struct ArticleTemplate {
-    pub id: String,
-    pub title: String,
-    pub author: String,
-    pub created_time: String,
-    pub content: String,
-    pub tags: String,
-}
-
-#[derive(Template)]
-#[template(path = "publish_article.html")]
-pub struct PublishArticleTemplate {
-    pub title: String,
-}
-
-#[derive(Template)]
-#[template(path = "edit_article.html")]
-pub struct EditArticleTemplate {
-    pub id: String,
-    pub title: String,
-    pub tags: String,
-    pub content: String,
-}
-
 #[handler]
 pub async fn index(_session: &Session, pool: Data<&DBPool>) -> impl IntoResponse {
     let articles = db::list_article(&pool).await;
 
     match articles {
         Ok(articles) => {
-            let tpl = IndexTemplate {
-                title: "首页".to_string(),
-                article_list: articles,
-            };
-
-            Html(tpl.render().unwrap()).into_response()
+            let mut context = Context::new();
+            context.insert("title", "首页");
+            context.insert("article_list", &articles);
+            let s = TEMPLATES.render("index.html", &context).unwrap();
+            Html(s).into_response()
         }
         Err(err) => {
-            let tpl = ErrorTemplate {
-                title: "错误".to_string(),
-                msg: err.to_string(),
-            };
-
-            Html(tpl.render().unwrap()).into_response()
+            let mut context = Context::new();
+            context.insert("title", "错误");
+            context.insert("msg", &err.to_string());
+            let s = TEMPLATES.render("error.html", &context).unwrap();
+            Html(s).into_response()
         }
     }
 }
@@ -165,34 +132,29 @@ pub async fn article_details(
     let article_r = db::get_article(article_id, &pool).await;
 
     match article_r {
-        Ok(article) => {
+        Ok(mut article) => {
             let content = markdown::to_html(article.raw_content.as_str());
+            article.raw_content = content;
 
-            let tpl = ArticleTemplate {
-                id: article.id.to_string(),
-                title: article.title,
-                author: article.author_id.to_string(),
-                created_time: article.created_time.to_string(),
-                tags: article.tags,
-                content: content,
-            };
-
-            Html(tpl.render().unwrap()).into_response()
+            let mut context = Context::new();
+            context.insert("title", &article.title);
+            context.insert("article", &article);
+            let s = TEMPLATES.render("article.html", &context).unwrap();
+            Html(s).into_response()
         }
         Err(err) => {
+            let mut context = Context::new();
+
             if err.to_string().contains("no rows returned") {
-                let tpl = NotFoundTemplate {
-                    title: "404".to_string(),
-                };
-
-                return Html(tpl.render().unwrap()).into_response();
+                context.insert("title", "404");
+                let s = TEMPLATES.render("404.html", &context).unwrap();
+                return Html(s).into_response();
             }
-            let tpl = ErrorTemplate {
-                title: "错误".to_string(),
-                msg: err.to_string(),
-            };
 
-            Html(tpl.render().unwrap()).into_response()
+            context.insert("title", "错误");
+            context.insert("msg", &err.to_string());
+            let s = TEMPLATES.render("error.html", &context).unwrap();
+            Html(s).into_response()
         }
     }
 }
@@ -201,11 +163,10 @@ pub async fn article_details(
 pub async fn publish_article_page(session: &Session) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
-            let tpl = PublishArticleTemplate {
-                title: "写文章".to_string(),
-            };
-
-            Html(tpl.render().unwrap()).into_response()
+            let mut context = Context::new();
+            context.insert("title", "写文章");
+            let s = TEMPLATES.render("publish_article.html", &context).unwrap();
+            Html(s).into_response()
         }
         None => Response::builder()
             .status(StatusCode::FOUND)
@@ -262,29 +223,25 @@ pub async fn edit_article_page(
 
             match article_r {
                 Ok(article) => {
-                    let tpl = EditArticleTemplate {
-                        id: article.id.to_string(),
-                        title: article.title.to_string(),
-                        tags: article.tags.to_string(),
-                        content: article.raw_content.to_string(),
-                    };
-
-                    Html(tpl.render().unwrap()).into_response()
+                    let mut context = Context::new();
+                    context.insert("title", &article.title);
+                    context.insert("article", &article);
+                    let s = TEMPLATES.render("edit_article.html", &context).unwrap();
+                    Html(s).into_response()
                 }
                 Err(err) => {
+                    let mut context = Context::new();
+
                     if err.to_string().contains("no rows returned") {
-                        let tpl = NotFoundTemplate {
-                            title: "404".to_string(),
-                        };
-
-                        return Html(tpl.render().unwrap()).into_response();
+                        context.insert("title", "404");
+                        let s = TEMPLATES.render("404.html", &context).unwrap();
+                        return Html(s).into_response();
                     }
-                    let tpl = ErrorTemplate {
-                        title: "错误".to_string(),
-                        msg: err.to_string(),
-                    };
-
-                    Html(tpl.render().unwrap()).into_response()
+        
+                    context.insert("title", "错误");
+                    context.insert("msg", &err.to_string());
+                    let s = TEMPLATES.render("error.html", &context).unwrap();
+                    Html(s).into_response()
                 }
             }
         }
@@ -328,19 +285,18 @@ pub async fn edit_article(
                         .finish()
                 }
                 Err(err) => {
+                    let mut context = Context::new();
+
                     if err.to_string().contains("no rows returned") {
-                        let tpl = NotFoundTemplate {
-                            title: "404".to_string(),
-                        };
-
-                        return Html(tpl.render().unwrap()).into_response();
+                        context.insert("title", "404");
+                        let s = TEMPLATES.render("404.html", &context).unwrap();
+                        return Html(s).into_response();
                     }
-                    let tpl = ErrorTemplate {
-                        title: "错误".to_string(),
-                        msg: err.to_string(),
-                    };
-
-                    Html(tpl.render().unwrap()).into_response()
+        
+                    context.insert("title", "错误");
+                    context.insert("msg", &err.to_string());
+                    let s = TEMPLATES.render("error.html", &context).unwrap();
+                    Html(s).into_response()
                 }
             }
         }
