@@ -6,10 +6,21 @@
         <a class="right new-article" href="/article/publish">发布新文章</a>
     </div>
 
-    {% for article in article_list %}
-    <li>
-        <a href="/article?id={{ article.id }}">{{article.title}}</a>
-    </li>
-    {% endfor %}
+    <div class="section-body article-list">
+        <ul>
+            {% for article in article_list %}
+            <li>
+                <span class="left">
+                    <a href="/article?id={{article.id}}" class="title left">{{article.title}}</a>
+                    <small class="tags">&nbsp;&nbsp;{{article.tags}}</small>
+                </span>
+                <span class="right info">
+                    <span class="author">{{article.author_id}}</span>
+                    <span class="timestamp">{{article.created_time}}</span>
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
 </div>
 {% endblock %}

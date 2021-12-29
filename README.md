@@ -14,6 +14,9 @@
 ### 注册
 `POST` /signup
 
+### 退出登录
+`POST` /signout
+
 ### 发布文章页面
 `GET` /article/publish
 

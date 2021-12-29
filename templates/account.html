@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="body-content">
+    <h3>账户信息</h3>
+    <div class="account_info">
+        当前账户: {{current_user}}
+        <br>
+        <br>
+        <br>
+        <a class="linked" href="/signout">登出</a>
+    </div>
+</div>
+{% endblock %}

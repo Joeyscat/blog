@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use markdown;
 use poem::{
     handler,
     http::{header, StatusCode},
@@ -9,7 +10,6 @@ use poem::{
 use serde::Deserialize;
 use std::str::FromStr;
 use tera::{Context, Tera};
-use markdown;
 
 use crate::DBPool;
 
@@ -33,25 +33,10 @@ lazy_static! {
 
 #[handler]
 pub fn signin_ui() -> impl IntoResponse {
-    Html(
-        r#"
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><title>Example CSRF</title></head>
-    <body>
-    <form action="/signin" method="post">
-        <div>
-            <label>Username:<input type="text" name="username" value="test" /></label>
-        </div>
-        <div>
-            <label>Password:<input type="password" name="password" value="123456" /></label>
-        </div>
-        <button type="submit">Login</button>
-    </form>
-    </body>
-    </html>
-    "#,
-    )
+    let mut context = Context::new();
+    context.insert("title", "登录");
+    let s = TEMPLATES.render("signin.html", &context).unwrap();
+    Html(s).into_response()
 }
 
 #[derive(Deserialize)]
@@ -85,7 +70,24 @@ pub fn signin(Form(params): Form<SigninParams>, session: &Session) -> impl IntoR
 }
 
 #[handler]
-pub fn logout(session: &Session) -> impl IntoResponse {
+pub fn account(session: &Session) -> impl IntoResponse {
+    match session.get::<String>("username") {
+        Some(username) => {
+            let mut context = Context::new();
+            context.insert("title", &username);
+            context.insert("current_user", &username);
+            let s = TEMPLATES.render("account.html", &context).unwrap();
+            Html(s).into_response()
+        }
+        None => Response::builder()
+            .status(StatusCode::FOUND)
+            .header(header::LOCATION, "/signin")
+            .finish(),
+    }
+}
+
+#[handler]
+pub fn signout(session: &Session) -> impl IntoResponse {
     session.purge();
     Response::builder()
         .status(StatusCode::FOUND)
@@ -237,7 +239,7 @@ pub async fn edit_article_page(
                         let s = TEMPLATES.render("404.html", &context).unwrap();
                         return Html(s).into_response();
                     }
-        
+
                     context.insert("title", "错误");
                     context.insert("msg", &err.to_string());
                     let s = TEMPLATES.render("error.html", &context).unwrap();
@@ -292,7 +294,7 @@ pub async fn edit_article(
                         let s = TEMPLATES.render("404.html", &context).unwrap();
                         return Html(s).into_response();
                     }
-        
+
                     context.insert("title", "错误");
                     context.insert("msg", &err.to_string());
                     let s = TEMPLATES.render("error.html", &context).unwrap();

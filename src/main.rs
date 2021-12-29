@@ -49,7 +49,8 @@ async fn main() -> Result<(), std::io::Error> {
         .at("/", get(handler::index))
         .at("/article", get(handler::article_details))
         .at("/signin", get(handler::signin_ui).post(handler::signin))
-        .at("/logout", get(handler::logout))
+        .at("/signout", get(handler::signout))
+        .at("/account", get(handler::account))
         .at(
             "/article/publish",
             get(handler::publish_article_page).post(handler::publish_article),
