@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use markdown;
+use mongodb::{Database, bson::oid::ObjectId};
 use poem::{
     handler,
     http::{header, StatusCode},
@@ -10,8 +11,6 @@ use poem::{
 use serde::Deserialize;
 use std::str::FromStr;
 use tera::{Context, Tera};
-
-use crate::DBPool;
 
 use crate::db;
 use crate::model::Article;
@@ -96,7 +95,7 @@ pub fn signout(session: &Session) -> impl IntoResponse {
 }
 
 #[handler]
-pub async fn index(_session: &Session, pool: Data<&DBPool>) -> impl IntoResponse {
+pub async fn index(_session: &Session, pool: Data<&Database>) -> impl IntoResponse {
     let articles = db::list_article(&pool).await;
 
     match articles {
@@ -120,18 +119,16 @@ pub async fn index(_session: &Session, pool: Data<&DBPool>) -> impl IntoResponse
 #[derive(Deserialize)]
 pub struct FindArticle {
     id: Option<String>,
-    title: Option<String>,
+    title: Option<String>
 }
 
 #[handler]
 pub async fn article_details(
     Query(FindArticle { id, title: _ }): Query<FindArticle>,
     _session: &Session,
-    pool: Data<&DBPool>,
+    pool: Data<&Database>,
 ) -> impl IntoResponse {
-    let article_id = uuid::Uuid::from_str(id.unwrap().as_str()).unwrap();
-
-    let article_r = db::get_article(article_id, &pool).await;
+    let article_r = db::get_article(id.unwrap(), &pool).await;
 
     match article_r {
         Ok(mut article) => {
@@ -188,7 +185,7 @@ pub struct PublishArticleParams {
 pub async fn publish_article(
     Form(params): Form<PublishArticleParams>,
     session: &Session,
-    pool: Data<&DBPool>,
+    pool: Data<&Database>,
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
@@ -215,13 +212,11 @@ pub async fn publish_article(
 pub async fn edit_article_page(
     Query(FindArticle { id, title: _ }): Query<FindArticle>,
     session: &Session,
-    pool: Data<&DBPool>,
+    pool: Data<&Database>,
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
-            let article_id = uuid::Uuid::from_str(id.unwrap().as_str()).unwrap();
-
-            let article_r = db::get_article(article_id, &pool).await;
+            let article_r = db::get_article(id.unwrap(), &pool).await;
 
             match article_r {
                 Ok(article) => {
@@ -266,13 +261,13 @@ pub struct EditArticleParams {
 pub async fn edit_article(
     Form(params): Form<EditArticleParams>,
     session: &Session,
-    pool: Data<&DBPool>,
+    pool: Data<&Database>,
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
-            let article_id = uuid::Uuid::from_str(params.id.as_str()).unwrap();
+            let article_id = ObjectId::from_str(params.id.as_str());
 
-            let article_r = db::get_article(article_id, &pool).await;
+            let article_r = db::get_article(params.id.clone(), &pool).await;
 
             match article_r {
                 Ok(mut article) => {

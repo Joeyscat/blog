@@ -1,4 +1,3 @@
-use core::time;
 use std::str::FromStr;
 
 use poem::{
@@ -8,14 +7,12 @@ use poem::{
     EndpointExt, Result, Route, Server,
 };
 
-use sqlx::postgres::PgPoolOptions;
 
 mod db;
 mod handler;
 mod middleware;
 mod model;
 
-pub type DBPool = sqlx::postgres::PgPool;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -33,17 +30,15 @@ async fn main() -> Result<(), std::io::Error> {
         )
     })?;
 
-    let pool: DBPool = PgPoolOptions::new()
-        .max_connections(200)
-        .connect_timeout(time::Duration::from_secs(2))
-        .connect(database_uri.as_str())
+    let mongodb = mongodb::Client::with_uri_str(database_uri)
         .await
         .map_err(|err| {
             std::io::Error::new(
-                std::io::ErrorKind::NotFound,
+                std::io::ErrorKind::ConnectionAborted,
                 format!("初始化数据库连接错误: {}", err),
             )
-        })?;
+        })?
+        .database("joeyscat");
 
     let app = Route::new()
         .at("/", get(handler::index))
@@ -60,7 +55,7 @@ async fn main() -> Result<(), std::io::Error> {
             get(handler::edit_article_page).post(handler::edit_article),
         )
         .with(CookieSession::new(CookieConfig::new()))
-        .data(pool)
+        .data(mongodb)
         .around(middleware::log);
     Server::new(TcpListener::bind("0.0.0.0:9527"))
         .run(app)

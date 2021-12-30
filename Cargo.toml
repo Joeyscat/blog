@@ -12,13 +12,8 @@ serde_derive = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing-subscriber = "0.2"
 tracing = "0.1"
-sqlx = { version = "0.5", features = [
-    "runtime-tokio-rustls",
-    "postgres",
-    "uuid",
-    "chrono",
-] }
-uuid = { version = "0.8", features = ["serde", "v4"] }
+mongodb = { version = "2" }
+futures = "0.3"
 chrono = { features = ["serde"], version = "0.4" }
 markdown = "0.3"
 tera = { version = "1" }

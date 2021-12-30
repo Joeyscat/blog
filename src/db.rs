@@ -1,103 +1,82 @@
-use poem::error::InternalServerError;
+use std::str::FromStr;
+
 use poem::Result;
-use uuid::Uuid;
+use poem::{error::NotFoundError, http::StatusCode};
+
+use mongodb::{
+    bson::{doc, oid::ObjectId, Bson, Document},
+    Database,
+};
+use tracing::debug;
 
 use crate::model::Article;
 
-use crate::DBPool;
+pub async fn create_article(article: Article, mongo: &Database) -> Result<String, poem::Error> {
+    let id = mongo
+        .collection::<Article>("article")
+        .insert_one(article, None)
+        .await
+        .map_err(|e| poem::Error::new(e, StatusCode::from_u16(500).unwrap()))?
+        .inserted_id
+        .as_object_id()
+        .unwrap()
+        .to_string();
 
-pub async fn create_article(article: Article, pool: &DBPool) -> Result<Uuid, poem::Error> {
-    let rec = sqlx::query!(
-        r#"
-insert into article (id, title, raw_content, author_id, tags, status, created_time)
-values ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id
-"#,
-        article.id,
-        article.title,
-        article.raw_content,
-        article.author_id,
-        article.tags,
-        article.status,
-        article.created_time,
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(InternalServerError)?;
-
-    Ok(rec.id)
+    Ok(id)
 }
 
-pub async fn update_article(article: Article, pool: &DBPool) -> Result<bool, poem::Error> {
-    let rows_affected = sqlx::query!(
-        r#"
-update article set title = $1, raw_content = $2, tags = $3, status = $4, updated_time = $5
-where id = $6
-"#,
-        article.title,
-        article.raw_content,
-        article.tags,
-        article.status,
-        article.updated_time,
-        article.id,
-    )
-    .execute(pool)
-    .await
-    .map_err(InternalServerError)?
-    .rows_affected();
+pub async fn update_article(article: Article, mongo: &Database) -> Result<bool, poem::Error> {
+    let query = doc! {"_id":""};
+    let update = doc! {
+        "title":"",
+        "raw_content":"",
+        "tags":"",
+        "status":"",
+        "updated_time":"",
+    };
 
-    Ok(rows_affected > 0)
+    let matched_count = mongo
+        .collection::<Article>("article")
+        .update_one(query, update, None)
+        .await
+        .map_err(|e| poem::Error::new(e, StatusCode::from_u16(500).unwrap()))?
+        .matched_count;
+
+    Ok(matched_count > 0)
 }
 
-pub async fn get_article(article_id: Uuid, pool: &DBPool) -> Result<Article, poem::Error> {
-    let rec = sqlx::query!(
-        r#"
-select id, title, raw_content, author_id, tags, status, created_time, updated_time
-from article
-where id = $1
-"#,
-        article_id,
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(InternalServerError)?;
+pub async fn get_article(article_id: String, mongo: &Database) -> Result<Article, poem::Error> {
+    debug!("get article: {}", article_id);
+    let oid = ObjectId::from_str(article_id.as_str()).unwrap();
+    let article = mongo
+        .collection::<Article>("article")
+        .find_one(doc! {"_id":oid}, None)
+        .await
+        .map_err(|e| poem::Error::new(e, StatusCode::from_u16(500).unwrap()))?;
 
-    Ok(Article {
-        id: rec.id,
-        title: rec.title,
-        raw_content: rec.raw_content,
-        author_id: rec.author_id,
-        tags: rec.tags,
-        status: rec.status,
-        created_time: rec.created_time,
-        updated_time: rec.updated_time,
-    })
-}
-
-pub async fn list_article(pool: &DBPool) -> Result<Vec<Article>, poem::Error> {
-    let recs = sqlx::query!(
-        r#"
-select id, title, raw_content, author_id, tags, status, created_time, updated_time
-from article
-"#,
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(InternalServerError)?;
-
-    let mut articles = Vec::new();
-    for rec in recs {
-        articles.push(Article {
-            id: rec.id,
-            title: rec.title,
-            raw_content: rec.raw_content,
-            author_id: rec.author_id,
-            tags: rec.tags,
-            status: rec.status,
-            created_time: rec.created_time,
-            updated_time: rec.updated_time,
-        });
+    match article {
+        Some(article) => Ok(article),
+        None => Err(poem::error::NotFoundError.into()),
     }
-
-    Ok(articles)
 }
+
+use futures::stream::TryStreamExt;
+
+pub async fn list_article(mongo: &Database) -> Result<Vec<Article>, poem::Error> {
+    let cursor: mongodb::Cursor<Article> = mongo
+        .collection::<Article>("article")
+        .find(doc! {}, None)
+        .await
+        .map_err(|e| poem::Error::new(e, StatusCode::from_u16(500).unwrap()))?;
+
+    let result: Vec<Article> = cursor.try_collect().await.unwrap();
+
+    Ok(result)
+}
+
+// fn doc_to_article(doc: &Document) -> poem::Result<Article> {
+//     // let article = Article {
+//     //     id
+//     // };
+//     unimplemented!()
+// }
