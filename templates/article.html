@@ -4,7 +4,9 @@
 {% block content %}
 <div class="body-content article_detail detail">
     <div class="article_detail_head">
+        {% if is_author %}
         <a href="/article/edit?id={{article.id}}">编辑</a>
+        {% endif %}
 
         <div class="title">
             <h2>

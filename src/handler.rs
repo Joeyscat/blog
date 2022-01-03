@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use markdown;
-use mongodb::{Database, bson::oid::ObjectId};
+use mongodb::{bson::oid::ObjectId, Database};
 use poem::{
     handler,
     http::{header, StatusCode},
@@ -8,7 +8,7 @@ use poem::{
     web::{Data, Form, Html, Query},
     IntoResponse, Response,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use tera::{Context, Tera};
 
@@ -47,7 +47,7 @@ pub struct SigninParams {
 #[handler]
 pub fn signin(Form(params): Form<SigninParams>, session: &Session) -> impl IntoResponse {
     if params.username == "test" && params.password == "123456" {
-        session.set("username", params.username);
+        session.set("username", "61cdbe3c9b146b6a8d851aff");
         Response::builder()
             .status(StatusCode::FOUND)
             .header(header::LOCATION, "/")
@@ -94,15 +94,29 @@ pub fn signout(session: &Session) -> impl IntoResponse {
         .finish()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+
+pub struct ArticleDetailView {
+    pub id: String,
+    pub title: String,
+    pub raw_content: String,
+    pub tags: String,
+    pub author_id: String,
+    pub created_time: String,
+    // pub updated_time: String,
+    pub status: i16,
+}
+
 #[handler]
 pub async fn index(_session: &Session, pool: Data<&Database>) -> impl IntoResponse {
     let articles = db::list_article(&pool).await;
 
     match articles {
         Ok(articles) => {
+            let article_views: Vec<ArticleDetailView> = articles.into_iter().map(|a| a.into()).collect();
             let mut context = Context::new();
             context.insert("title", "首页");
-            context.insert("article_list", &articles);
+            context.insert("article_list", &article_views);
             let s = TEMPLATES.render("index.html", &context).unwrap();
             Html(s).into_response()
         }
@@ -119,25 +133,44 @@ pub async fn index(_session: &Session, pool: Data<&Database>) -> impl IntoRespon
 #[derive(Deserialize)]
 pub struct FindArticle {
     id: Option<String>,
-    title: Option<String>
+    title: Option<String>,
 }
 
+impl From<Article> for ArticleDetailView {
+    fn from(a: Article) -> Self {
+        ArticleDetailView {
+            id: a.id.to_string(),
+            title: a.title,
+            raw_content:a.raw_content,
+            tags: a.tags,
+            author_id: a.author_id.to_string(),
+            created_time: a.created_time.to_string(),
+            status: a.status,
+        }
+    }
+}
 #[handler]
 pub async fn article_details(
     Query(FindArticle { id, title: _ }): Query<FindArticle>,
-    _session: &Session,
+    session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
     let article_r = db::get_article(id.unwrap(), &pool).await;
 
     match article_r {
         Ok(mut article) => {
-            let content = markdown::to_html(article.raw_content.as_str());
-            article.raw_content = content;
+            let author = (&article).author_id.to_string();
+            let mut articlev: ArticleDetailView = article.into();
+            articlev.raw_content = markdown::to_html(articlev.raw_content.as_str());
 
             let mut context = Context::new();
-            context.insert("title", &article.title);
-            context.insert("article", &article);
+            context.insert("title", &articlev.title);
+            context.insert("article", &articlev);
+
+            let username = session.get::<String>("username");
+            if username.is_some() && username.unwrap() == author {
+                context.insert("is_author", &true);
+            }
             let s = TEMPLATES.render("article.html", &context).unwrap();
             Html(s).into_response()
         }
@@ -188,8 +221,11 @@ pub async fn publish_article(
     pool: Data<&Database>,
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
-        Some(_username) => {
+        Some(username) => {
+            let author_id = ObjectId::from_str(username.as_str()).unwrap();
+
             let mut new_article = Article::default();
+            new_article.author_id = author_id;
             new_article.title = params.title;
             new_article.raw_content = params.raw_content;
             new_article.tags = params.tags;
@@ -220,9 +256,12 @@ pub async fn edit_article_page(
 
             match article_r {
                 Ok(article) => {
+                    let articlev: ArticleDetailView = article.into();
+
                     let mut context = Context::new();
-                    context.insert("title", &article.title);
-                    context.insert("article", &article);
+                    context.insert("title", &articlev.title);
+                    context.insert("article", &articlev);
+
                     let s = TEMPLATES.render("edit_article.html", &context).unwrap();
                     Html(s).into_response()
                 }
@@ -265,8 +304,6 @@ pub async fn edit_article(
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
-            let article_id = ObjectId::from_str(params.id.as_str());
-
             let article_r = db::get_article(params.id.clone(), &pool).await;
 
             match article_r {
