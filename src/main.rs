@@ -7,12 +7,11 @@ use poem::{
     EndpointExt, Result, Route, Server,
 };
 
-
 mod db;
+mod gitee;
 mod handler;
 mod middleware;
 mod model;
-
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -44,6 +43,7 @@ async fn main() -> Result<(), std::io::Error> {
         .at("/", get(handler::index))
         .at("/article", get(handler::article_details))
         .at("/signin", get(handler::signin_ui).post(handler::signin))
+        .at("/gitee/signout", get(handler::gitee_signin))
         .at("/signout", get(handler::signout))
         .at("/account", get(handler::account))
         .at(

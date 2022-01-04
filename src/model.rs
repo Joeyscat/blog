@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde_derive::{Deserialize, Serialize};
 use mongodb::bson::oid::ObjectId;
+use mongodb::bson::Document;
 
 ///
 /// Model: Article
@@ -33,6 +34,18 @@ impl Default for Article {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub from: String,
+    pub from_doc: Document,
+    pub created_time: DateTime<Utc>,
+    pub updated_time: Option<DateTime<Utc>>,
+    pub status: i16,
+}
+
 
 #[cfg(test)]
 mod tests {

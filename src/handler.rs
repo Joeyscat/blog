@@ -6,13 +6,15 @@ use poem::{
     http::{header, StatusCode},
     session::Session,
     web::{Data, Form, Html, Query},
-    IntoResponse, Response,
+    IntoResponse, Response, Result,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use tera::{Context, Tera};
+use tracing::debug;
 
 use crate::db;
+use crate::gitee;
 use crate::model::Article;
 
 lazy_static! {
@@ -46,7 +48,7 @@ pub struct SigninParams {
 
 #[handler]
 pub fn signin(Form(params): Form<SigninParams>, session: &Session) -> impl IntoResponse {
-    if params.username == "test" && params.password == "123456" {
+    if params.username == "jojo" && params.password == "123456" {
         session.set("username", "61cdbe3c9b146b6a8d851aff");
         Response::builder()
             .status(StatusCode::FOUND)
@@ -65,6 +67,59 @@ pub fn signin(Form(params): Form<SigninParams>, session: &Session) -> impl IntoR
     "#,
         )
         .into_response()
+    }
+}
+
+#[derive(Deserialize)]
+pub struct GiteeSignin {
+    state: Option<String>,
+    code: String,
+}
+
+#[handler]
+pub async fn gitee_signin(
+    Query(GiteeSignin { state: _, code }): Query<GiteeSignin>,
+    session: &Session,
+) -> Result<impl IntoResponse> {
+    debug!("code: {}", code);
+
+    // get access_token
+    let access_token = gitee::get_access_token(code).await?;
+    debug!("access_token: {}", access_token);
+
+    // get user info
+    let gitee_user = gitee::get_user_info(access_token).await?;
+    debug!("gitee_user: {:?}", gitee_user);
+
+    let user = db::find_user_by_giteeid(gitee_user.id).await;
+    debug!("find user result: {:?}", user);
+    match user {
+        Ok(user) => {
+            // update session
+            session.set("username", user.id.to_string());
+            return Ok(Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, "/")
+                .finish());
+        }
+        Err(e) => {
+            // save user if new
+            if e.to_string().contains("no record") {
+                let mut context = Context::new();
+                context.insert("title", "错误");
+                context.insert("msg", &e.to_string());
+                let s = TEMPLATES.render("error.html", &context).unwrap();
+                Ok(Html(s).into_response())
+            } else {
+                let nid = db::create_giteeuser(gitee_user).await?;
+
+                session.set("username", nid);
+                return Ok(Response::builder()
+                    .status(StatusCode::FOUND)
+                    .header(header::LOCATION, "/")
+                    .finish());
+            }
+        }
     }
 }
 
@@ -113,7 +168,8 @@ pub async fn index(_session: &Session, pool: Data<&Database>) -> impl IntoRespon
 
     match articles {
         Ok(articles) => {
-            let article_views: Vec<ArticleDetailView> = articles.into_iter().map(|a| a.into()).collect();
+            let article_views: Vec<ArticleDetailView> =
+                articles.into_iter().map(|a| a.into()).collect();
             let mut context = Context::new();
             context.insert("title", "首页");
             context.insert("article_list", &article_views);
@@ -141,7 +197,7 @@ impl From<Article> for ArticleDetailView {
         ArticleDetailView {
             id: a.id.to_string(),
             title: a.title,
-            raw_content:a.raw_content,
+            raw_content: a.raw_content,
             tags: a.tags,
             author_id: a.author_id.to_string(),
             created_time: a.created_time.to_string(),

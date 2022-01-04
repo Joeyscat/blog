@@ -9,7 +9,8 @@ use mongodb::{
 };
 use tracing::debug;
 
-use crate::model::Article;
+use crate::model::{Article,User};
+use crate::gitee;
 
 pub async fn create_article(article: Article, mongo: &Database) -> Result<String, poem::Error> {
     let id = mongo
@@ -72,6 +73,14 @@ pub async fn list_article(mongo: &Database) -> Result<Vec<Article>, poem::Error>
     let result: Vec<Article> = cursor.try_collect().await.unwrap();
 
     Ok(result)
+}
+
+pub async fn find_user_by_giteeid(id: i64) -> Result<User> {
+    todo!()
+}
+
+pub async fn create_giteeuser(user: gitee::UserInfo) -> Result<String> {
+    todo!()
 }
 
 // fn doc_to_article(doc: &Document) -> poem::Result<Article> {

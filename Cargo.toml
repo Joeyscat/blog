@@ -9,6 +9,7 @@ edition = "2021"
 poem = { version = "1", features = ["session"] }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
+serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing-subscriber = "0.2"
 tracing = "0.1"
@@ -18,3 +19,4 @@ chrono = { features = ["serde"], version = "0.4" }
 markdown = "0.3"
 tera = { version = "1" }
 lazy_static = {version = "*"}
+reqwest = {version = "*"}
