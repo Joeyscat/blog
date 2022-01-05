@@ -3,15 +3,6 @@ use std::collections::HashMap;
 use poem::{Error, Result};
 use serde_derive::{Deserialize, Serialize};
 
-// #[derive(Debug, Serialize, Deserialize)]
-// struct TokenReq {
-//     grant_type: String,
-//     code: String,
-//     client_id: String,
-//     client_secret: String,
-//     redirect_uri: String,
-// }
-
 #[derive(Deserialize)]
 struct TokenResp {
     access_token: String,
@@ -22,13 +13,18 @@ struct TokenResp {
     created_at: i64,
 }
 
-pub async fn get_access_token(code: String) -> Result<String> {
+pub async fn get_access_token(
+    code: String,
+    client_id: String,
+    client_secret: String,
+    redirect_uri: String,
+) -> Result<String> {
     let mut map = HashMap::new();
-    map.insert("grant_type", "rust");
-    map.insert("code", "json");
-    map.insert("client_id", "json");
-    map.insert("client_secret", "json");
-    map.insert("redirect_uri", "json");
+    map.insert("grant_type", "authorization_code");
+    map.insert("code", code.as_str());
+    map.insert("client_id", client_id.as_str());
+    map.insert("client_secret", client_secret.as_str());
+    map.insert("redirect_uri", redirect_uri.as_str());
 
     let client = reqwest::Client::new();
     let res = client
@@ -36,12 +32,27 @@ pub async fn get_access_token(code: String) -> Result<String> {
         .json(&map)
         .send()
         .await
-        .map_err(poem::error::InternalServerError)?
-        .json::<TokenResp>()
-        .await
         .map_err(poem::error::InternalServerError)?;
 
-    Ok(res.access_token)
+    match res.status() {
+        reqwest::StatusCode::OK => {
+            let token_resp = res
+                .json::<TokenResp>()
+                .await
+                .map_err(poem::error::InternalServerError)?;
+            Ok(token_resp.access_token)
+        }
+        _ => {
+            let t = res
+                .text_with_charset("utf-8")
+                .await
+                .map_err(poem::error::InternalServerError)?;
+            Err(Error::from_string(
+                t,
+                poem::http::StatusCode::INTERNAL_SERVER_ERROR,
+            ))
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

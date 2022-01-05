@@ -75,7 +75,7 @@ pub async fn list_article(mongo: &Database) -> Result<Vec<Article>, poem::Error>
     Ok(result)
 }
 
-pub async fn find_user_by_giteeid(id: i64) -> Result<User> {
+pub async fn find_user_by_giteeid(mongo: &Database, id: i64) -> Result<User> {
     todo!()
 }
 

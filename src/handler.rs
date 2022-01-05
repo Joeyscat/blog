@@ -11,7 +11,7 @@ use poem::{
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use tera::{Context, Tera};
-use tracing::debug;
+use tracing::info;
 
 use crate::db;
 use crate::gitee;
@@ -29,6 +29,16 @@ lazy_static! {
         tera.autoescape_on(vec!["html", ".sql"]);
         // tera.register_filter("do_nothing", do_nothing_filter);
         tera
+    };
+
+    pub static ref CLIENT_ID:String = {
+        std::env::var("GITEE_CLIENT_ID").expect("GITEE_CLIENT_ID")
+    };
+    pub static ref CLIENT_SECRET:String = {
+        std::env::var("GITEE_CLIENT_SECRET").expect("GITEE_CLIENT_SECRET")
+    };
+    pub static ref REDIRECT_URI:String = {
+        std::env::var("GITEE_REDIRECT_URI").expect("GITEE_REDIRECT_URI")
     };
 }
 
@@ -80,19 +90,26 @@ pub struct GiteeSignin {
 pub async fn gitee_signin(
     Query(GiteeSignin { state: _, code }): Query<GiteeSignin>,
     session: &Session,
+    pool: Data<&Database>,
 ) -> Result<impl IntoResponse> {
-    debug!("code: {}", code);
+    info!("code: {}", code);
 
     // get access_token
-    let access_token = gitee::get_access_token(code).await?;
-    debug!("access_token: {}", access_token);
+    let access_token = gitee::get_access_token(
+        code,
+        CLIENT_ID.to_string(),
+        CLIENT_SECRET.to_string(),
+        REDIRECT_URI.to_string(),
+    )
+    .await?;
+    info!("access_token: {}", access_token);
 
     // get user info
     let gitee_user = gitee::get_user_info(access_token).await?;
-    debug!("gitee_user: {:?}", gitee_user);
+    info!("gitee_user: {:?}", gitee_user);
 
-    let user = db::find_user_by_giteeid(gitee_user.id).await;
-    debug!("find user result: {:?}", user);
+    let user = db::find_user_by_giteeid(&pool, gitee_user.id).await;
+    info!("find user result: {:?}", user);
     match user {
         Ok(user) => {
             // update session
