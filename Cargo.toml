@@ -19,4 +19,4 @@ chrono = { features = ["serde"], version = "0.4" }
 markdown = "0.3"
 tera = { version = "1" }
 lazy_static = {version = "*"}
-reqwest = {version = "*"}
+reqwest = {version = "*", features = ["json"]}
