@@ -120,21 +120,23 @@ pub async fn gitee_signin(
                 .finish());
         }
         Err(e) => {
+            info!("error: {}", e.to_string());
             // save user if new
-            if e.to_string().contains("no record") {
-                let mut context = Context::new();
-                context.insert("title", "错误");
-                context.insert("msg", &e.to_string());
-                let s = TEMPLATES.render("error.html", &context).unwrap();
-                Ok(Html(s).into_response())
-            } else {
-                let nid = db::create_giteeuser(gitee_user).await?;
+            if e.to_string().contains("not found") {
+                info!("creating new user =====> {:?}", gitee_user);
+                let nid = db::create_giteeuser(&pool, gitee_user).await?;
 
                 session.set("username", nid);
                 return Ok(Response::builder()
                     .status(StatusCode::FOUND)
                     .header(header::LOCATION, "/")
                     .finish());
+            } else {
+                let mut context = Context::new();
+                context.insert("title", "错误");
+                context.insert("msg", &e.to_string());
+                let s = TEMPLATES.render("error.html", &context).unwrap();
+                Ok(Html(s).into_response())
             }
         }
     }
