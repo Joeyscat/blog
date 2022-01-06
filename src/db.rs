@@ -12,15 +12,16 @@ use crate::gitee;
 use crate::model::{Article, User};
 
 pub async fn create_article(article: Article, mongo: &Database) -> Result<String> {
+    let now = Utc::now().with_timezone(&FixedOffset::east(8 * 3600));
     let new_article = doc! {
         "_id": article.id,
         "title": article.title,
         "raw_content": article.raw_content,
         "tags": article.tags,
         "author_id": article.author_id,
-        "created_time": article.created_time,
-        "updated_time": article.updated_time,
-        "status": article.status as i32,
+        "created_time": now,
+        "updated_time": now,
+        "status": 1,
     };
 
     let id = mongo
@@ -44,7 +45,7 @@ pub async fn update_article(article: Article, mongo: &Database) -> Result<bool> 
             "raw_content":article.raw_content,
             "tags":article.tags,
             "status":article.status as i32,
-            "updated_time":Utc::now(),
+            "updated_time":Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
         }
     };
 
@@ -106,9 +107,9 @@ pub async fn find_user_by_giteeid(mongo: &Database, id: i64) -> Result<User> {
 }
 
 pub async fn create_giteeuser(mongo: &Database, gitee_user: gitee::UserInfo) -> Result<String> {
-    let user = User::default();
+    let now = Utc::now().with_timezone(&FixedOffset::east(8 * 3600));
     let new_user = doc! {
-        "_id": user.id,
+        "_id": ObjectId::new(),
         "username": &gitee_user.name,
         "auth_type": "gitee".to_owned(),
         "inner": {
@@ -120,9 +121,9 @@ pub async fn create_giteeuser(mongo: &Database, gitee_user: gitee::UserInfo) -> 
             "created_at": gitee_user.created_at,
             "email": gitee_user.email,
         },
-        "created_time": user.created_time,
-        "updated_time": user.updated_time,
-        "status": user.status as i32,
+        "created_time": now,
+        "updated_time": now,
+        "status": 1,
     };
 
     let id = mongo

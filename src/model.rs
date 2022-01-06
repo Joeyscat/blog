@@ -44,7 +44,9 @@ pub struct User {
     pub username: String,
     pub auth_type: String,
     pub inner: Document,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub created_time: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub updated_time: DateTime<Utc>,
     pub status: i16,
 }
@@ -71,5 +73,13 @@ mod tests {
         let id = ObjectId::new();
 
         println!("{}", id);
+    }
+
+    #[test]
+    fn test_datetime() {
+        use chrono::prelude::*;
+
+        println!("{}", Utc::now());
+        println!("{}", Utc::now().with_timezone(&FixedOffset::east(8 * 3600)));
     }
 }
