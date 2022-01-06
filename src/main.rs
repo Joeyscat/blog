@@ -42,7 +42,7 @@ async fn main() -> Result<(), std::io::Error> {
     let app = Route::new()
         .at("/", get(handler::index))
         .at("/article", get(handler::article_details))
-        .at("/signin", get(handler::signin_ui).post(handler::signin))
+        .at("/signin", get(handler::signin_ui))
         .at("/gitee/signin", get(handler::gitee_signin))
         .at("/signout", get(handler::signout))
         .at("/account", get(handler::account))
@@ -54,7 +54,7 @@ async fn main() -> Result<(), std::io::Error> {
             "/article/edit",
             get(handler::edit_article_page).post(handler::edit_article),
         )
-        .with(CookieSession::new(CookieConfig::new()))
+        .with(CookieSession::new(CookieConfig::default().secure(false)))
         .data(mongodb)
         .around(middleware::log);
     Server::new(TcpListener::bind("0.0.0.0:9527"))
