@@ -46,6 +46,12 @@ lazy_static! {
 pub fn signin_ui() -> impl IntoResponse {
     let mut context = Context::new();
     context.insert("title", "登录");
+    let gitee_signin_uri = format!(
+        "https://gitee.com/oauth/authorize?client_id={}&redirect_uri={}&response_type=code",
+        CLIENT_ID.to_string(),
+        REDIRECT_URI.to_string()
+    );
+    context.insert("gitee_signin_uri", &gitee_signin_uri);
     let s = TEMPLATES.render("signin.html", &context).unwrap();
     Html(s).into_response()
 }
