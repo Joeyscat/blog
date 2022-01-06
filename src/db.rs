@@ -1,23 +1,33 @@
+use chrono::prelude::*;
+use poem::Result;
 use std::str::FromStr;
 
-use poem::Result;
-use poem::{error::NotFoundError, http::StatusCode};
-
 use mongodb::{
-    bson::{doc, oid::ObjectId, Bson, Document},
+    bson::{doc, oid::ObjectId},
     Database,
 };
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::gitee;
 use crate::model::{Article, User};
 
 pub async fn create_article(article: Article, mongo: &Database) -> Result<String> {
+    let new_article = doc! {
+        "_id": article.id,
+        "title": article.title,
+        "raw_content": article.raw_content,
+        "tags": article.tags,
+        "author_id": article.author_id,
+        "created_time": article.created_time,
+        "updated_time": article.updated_time,
+        "status": article.status as i32,
+    };
+
     let id = mongo
-        .collection::<Article>("article")
-        .insert_one(article, None)
+        .collection("article")
+        .insert_one(new_article, None)
         .await
-        .map_err(|e| poem::Error::new(e, StatusCode::INTERNAL_SERVER_ERROR))?
+        .map_err(poem::error::InternalServerError)?
         .inserted_id
         .as_object_id()
         .unwrap()
@@ -27,20 +37,24 @@ pub async fn create_article(article: Article, mongo: &Database) -> Result<String
 }
 
 pub async fn update_article(article: Article, mongo: &Database) -> Result<bool> {
-    let query = doc! {"_id":""};
+    let query = doc! {"_id":article.id};
     let update = doc! {
-        "title":"",
-        "raw_content":"",
-        "tags":"",
-        "status":"",
-        "updated_time":"",
+        "$set":{
+            "title":article.title,
+            "raw_content":article.raw_content,
+            "tags":article.tags,
+            "status":article.status as i32,
+            "updated_time":Utc::now(),
+        }
     };
+
+    info!("update article: query={:?}, update={:?}", query, update);
 
     let matched_count = mongo
         .collection::<Article>("article")
         .update_one(query, update, None)
         .await
-        .map_err(|e| poem::Error::new(e, StatusCode::INTERNAL_SERVER_ERROR))?
+        .map_err(poem::error::InternalServerError)?
         .matched_count;
 
     Ok(matched_count > 0)
@@ -53,8 +67,9 @@ pub async fn get_article(article_id: String, mongo: &Database) -> Result<Article
         .collection::<Article>("article")
         .find_one(doc! {"_id":oid}, None)
         .await
-        .map_err(|e| poem::Error::new(e, StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(poem::error::InternalServerError)?;
 
+    debug!("get article result: {:?}", article);
     match article {
         Some(article) => Ok(article),
         None => Err(poem::error::NotFoundError.into()),
@@ -68,7 +83,7 @@ pub async fn list_article(mongo: &Database) -> Result<Vec<Article>> {
         .collection::<Article>("article")
         .find(doc! {}, None)
         .await
-        .map_err(|e| poem::Error::new(e, StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(poem::error::InternalServerError)?;
 
     let result: Vec<Article> = cursor.try_collect().await.unwrap();
 
@@ -82,7 +97,7 @@ pub async fn find_user_by_giteeid(mongo: &Database, id: i64) -> Result<User> {
         .collection::<User>("user")
         .find_one(doc! {"inner.id":id}, None)
         .await
-        .map_err(|e| poem::Error::new(e, StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map_err(poem::error::InternalServerError)?;
 
     match user {
         Some(user) => Ok(user),
@@ -91,24 +106,30 @@ pub async fn find_user_by_giteeid(mongo: &Database, id: i64) -> Result<User> {
 }
 
 pub async fn create_giteeuser(mongo: &Database, gitee_user: gitee::UserInfo) -> Result<String> {
-    let mut user = User::default();
-    user.auth_type = "gitee".to_owned();
-    user.username = gitee_user.name.clone();
-    user.inner = doc! {
-        "id": gitee_user.id,
-        "login": gitee_user.login,
-        "name": gitee_user.name,
-        "avatar_url": gitee_user.avatar_url,
-        "blog": gitee_user.blog,
-        "created_at": gitee_user.created_at,
-        "email": gitee_user.email,
+    let user = User::default();
+    let new_user = doc! {
+        "_id": user.id,
+        "username": &gitee_user.name,
+        "auth_type": "gitee".to_owned(),
+        "inner": {
+            "id": gitee_user.id,
+            "login": gitee_user.login,
+            "name": gitee_user.name,
+            "avatar_url": gitee_user.avatar_url,
+            "blog": gitee_user.blog,
+            "created_at": gitee_user.created_at,
+            "email": gitee_user.email,
+        },
+        "created_time": user.created_time,
+        "updated_time": user.updated_time,
+        "status": user.status as i32,
     };
 
     let id = mongo
-        .collection::<User>("user")
-        .insert_one(user, None)
+        .collection("user")
+        .insert_one(new_user, None)
         .await
-        .map_err(|e| poem::Error::new(e, StatusCode::INTERNAL_SERVER_ERROR))?
+        .map_err(poem::error::InternalServerError)?
         .inserted_id
         .as_object_id()
         .unwrap()
@@ -116,10 +137,3 @@ pub async fn create_giteeuser(mongo: &Database, gitee_user: gitee::UserInfo) -> 
 
     Ok(id)
 }
-
-// fn doc_to_article(doc: &Document) -> poem::Result<Article> {
-//     // let article = Article {
-//     //     id
-//     // };
-//     unimplemented!()
-// }

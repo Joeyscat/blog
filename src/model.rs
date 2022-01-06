@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, MIN_DATETIME};
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::Document;
 use serde_derive::{Deserialize, Serialize};
@@ -15,8 +15,10 @@ pub struct Article {
     pub raw_content: String,
     pub tags: String,
     pub author_id: ObjectId,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub created_time: DateTime<Utc>,
-    pub updated_time: Option<DateTime<Utc>>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
+    pub updated_time: DateTime<Utc>,
     pub status: i16,
 }
 
@@ -29,7 +31,7 @@ impl Default for Article {
             tags: Default::default(),
             author_id: Default::default(),
             created_time: Utc::now(),
-            updated_time: None,
+            updated_time: MIN_DATETIME,
             status: 1,
         }
     }
@@ -43,7 +45,7 @@ pub struct User {
     pub auth_type: String,
     pub inner: Document,
     pub created_time: DateTime<Utc>,
-    pub updated_time: Option<DateTime<Utc>>,
+    pub updated_time: DateTime<Utc>,
     pub status: i16,
 }
 
@@ -55,7 +57,7 @@ impl Default for User {
             username: "".to_owned(),
             inner: Document::new(),
             created_time: Utc::now(),
-            updated_time: None,
+            updated_time: MIN_DATETIME,
             status: 1,
         }
     }
