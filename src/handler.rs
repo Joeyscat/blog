@@ -1,4 +1,4 @@
-
+use chrono::FixedOffset;
 use lazy_static::lazy_static;
 use markdown;
 use mongodb::{bson::oid::ObjectId, Database};
@@ -226,7 +226,11 @@ impl From<Article> for ArticleDetailView {
             raw_content: a.raw_content,
             tags: a.tags,
             author_id: a.author_id.to_string(),
-            created_time: a.created_time.to_string(),
+            created_time: a
+                .created_time
+                .with_timezone(&FixedOffset::east(8 * 3600))
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string(),
             status: a.status,
         }
     }

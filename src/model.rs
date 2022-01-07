@@ -78,8 +78,20 @@ mod tests {
     #[test]
     fn test_datetime() {
         use chrono::prelude::*;
+        use mongodb::bson::doc;
 
-        println!("{}", Utc::now());
-        println!("{}", Utc::now().with_timezone(&FixedOffset::east(8 * 3600)));
+        let now_utc = Utc::now();
+        let now_east_8 = Utc::now().with_timezone(&FixedOffset::east(8 * 3600));
+
+        println!("now_utc:\t{}", now_utc);
+        println!("now_east_8:\t{}", now_east_8);
+
+        let d = doc! {
+            "now":now_east_8
+        };
+        println!("doc:\t\t{}", d);
+
+        let dd = mongodb::bson::Bson::DateTime(now_east_8.into());
+        println!("dd:\t{}", dd);
     }
 }
