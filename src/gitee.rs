@@ -63,7 +63,7 @@ pub struct UserInfo {
     pub avatar_url: String,
     pub blog: String,
     pub created_at: String,
-    pub email: String,
+    pub email: Option<String>,
 }
 
 pub async fn get_user_info(access_token: String) -> Result<UserInfo> {
