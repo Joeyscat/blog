@@ -23,6 +23,7 @@ pub struct Article {
     pub status: i16,
     pub comments: Option<Vec<Comment>>,
     pub total_comments: Option<i32>,
+    pub author_name: Option<String>,
 }
 
 impl Default for Article {
@@ -38,6 +39,7 @@ impl Default for Article {
             status: 1,
             comments: None,
             total_comments: None,
+            author_name: None,
         }
     }
 }
@@ -46,8 +48,9 @@ impl Default for Article {
 pub struct Comment {
     pub content: String,
     pub author_id: ObjectId,
-    pub article_id: ObjectId,
+    pub author_name: String,
     pub reply_to: Option<ObjectId>,
+    pub reply_to_name: Option<String>,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub created_time: DateTime<Utc>,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
@@ -58,11 +61,11 @@ pub struct Comment {
 impl Comment {
     pub fn new(
         content: String,
-        article_id: String,
         author_id: String,
+        author_name: String,
         reply_to: Option<String>,
+        reply_to_name: Option<String>,
     ) -> Self {
-        let article_id = ObjectId::from_str(article_id.as_str()).unwrap();
         let author_id = ObjectId::from_str(author_id.as_str()).unwrap();
         let reply_to = reply_to
             .as_ref()
@@ -70,9 +73,10 @@ impl Comment {
 
         Self {
             content,
-            article_id,
+            author_name,
             author_id,
             reply_to,
+            reply_to_name,
             created_time: Utc::now(),
             updated_time: Utc::now(),
             status: 1,

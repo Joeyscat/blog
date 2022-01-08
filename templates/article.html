@@ -13,7 +13,7 @@
                 <a href="/article?id={{article.id}}">{{article.title}}</a>
             </h2>
         </div>
-        <p>{{article.author_id}} 发表于 {{article.created_time}}</p>
+        <p>{{article.author_name}} 发表于 {{article.created_time}}</p>
         <p>
             <small>Tags: {{article.tags}}</small>
         </p>
@@ -31,10 +31,10 @@
         {% for comment in article.comments %}
         <div class="item">
             <div class="comment-title">
-                <a class="author-name" href="#">{{comment.author_id}}</a>
+                <a class="author-name" href="#">{{comment.author_name}}</a>
                 {% if comment.reply_to %}
                 回复&nbsp;
-                <a class="author-name" href="#">{{comment.reply_to}}</a>
+                <a class="author-name" href="#">{{comment.reply_to_name}}</a>
                 &nbsp;
                 {% endif %}
                 <span class="created-time">{{comment.created_time}}</span>

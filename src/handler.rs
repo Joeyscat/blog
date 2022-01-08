@@ -58,44 +58,13 @@ pub fn signin_ui() -> impl IntoResponse {
 }
 
 #[derive(Deserialize)]
-pub struct SigninParams {
-    username: String,
-    password: String,
-}
-
-#[handler]
-pub fn signin(Form(params): Form<SigninParams>, session: &Session) -> impl IntoResponse {
-    if params.username == "jojo" && params.password == "123456" {
-        session.set("username", "61cdbe3c9b146b6a8d851aff");
-        Response::builder()
-            .status(StatusCode::FOUND)
-            .header(header::LOCATION, "/")
-            .finish()
-    } else {
-        Html(
-            r#"
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><title>Example CSRF</title></head>
-    <body>
-    no such user
-    </body>
-    </html>
-    "#,
-        )
-        .into_response()
-    }
-}
-
-#[derive(Deserialize)]
 pub struct GiteeSignin {
-    state: Option<String>,
     code: String,
 }
 
 #[handler]
 pub async fn gitee_signin(
-    Query(GiteeSignin { state: _, code }): Query<GiteeSignin>,
+    Query(GiteeSignin { code }): Query<GiteeSignin>,
     session: &Session,
     pool: Data<&Database>,
 ) -> Result<impl IntoResponse> {
@@ -120,7 +89,8 @@ pub async fn gitee_signin(
     match user {
         Ok(user) => {
             // update session
-            session.set("username", user.id.to_string());
+            session.set("uid", user.id.to_string());
+            session.set("username", user.username.to_string());
             return Ok(Response::builder()
                 .status(StatusCode::FOUND)
                 .header(header::LOCATION, "/")
@@ -130,10 +100,12 @@ pub async fn gitee_signin(
             info!("error: {}", e.to_string());
             // save user if new
             if e.to_string().contains("not found") {
-                info!("creating new user =====> {:?}", gitee_user);
+                let username = gitee_user.name.clone();
+                info!("creating new user =====> {}", username);
                 let nid = db::create_giteeuser(&pool, gitee_user).await?;
 
-                session.set("username", nid);
+                session.set("uid", nid);
+                session.set("username", username);
                 return Ok(Response::builder()
                     .status(StatusCode::FOUND)
                     .header(header::LOCATION, "/")
@@ -155,7 +127,7 @@ pub fn account(session: &Session) -> impl IntoResponse {
         Some(username) => {
             let mut context = Context::new();
             context.insert("title", &username);
-            context.insert("current_user", &username);
+            context.insert("username", &username);
             let s = TEMPLATES.render("account.html", &context).unwrap();
             Html(s).into_response()
         }
@@ -183,6 +155,7 @@ pub struct ArticleDetailView {
     pub raw_content: String,
     pub tags: String,
     pub author_id: String,
+    pub author_name: String,
     pub created_time: String,
     // pub updated_time: String,
     pub status: i16,
@@ -196,8 +169,9 @@ pub struct ArticleDetailView {
 pub struct CommentView {
     pub content: String,
     pub author_id: String,
-    pub article_id: String,
+    pub author_name: String,
     pub reply_to: Option<String>,
+    pub reply_to_name: Option<String>,
     pub created_time: String,
     pub status: i16,
 }
@@ -239,10 +213,9 @@ impl From<Article> for ArticleDetailView {
             None => Vec::new(),
         };
         let mut comment_page_nums = vec![1];
-        let comment_page_size = 2;
         if a.total_comments.is_some() {
-            let pages = (a.total_comments.unwrap() as f32 / comment_page_size as f32).ceil() as i32;
-            for i in 2..pages+1 {
+            let pages = (a.total_comments.unwrap() as f32 / comment_page_size() as f32).ceil() as i32;
+            for i in 2..pages + 1 {
                 comment_page_nums.push(i);
             }
         }
@@ -252,6 +225,7 @@ impl From<Article> for ArticleDetailView {
             raw_content: a.raw_content,
             tags: a.tags,
             author_id: a.author_id.to_string(),
+            author_name: a.author_name.unwrap(),
             created_time: a
                 .created_time
                 .with_timezone(&FixedOffset::east(8 * 3600))
@@ -270,8 +244,9 @@ impl From<Comment> for CommentView {
         CommentView {
             content: c.content,
             author_id: c.author_id.to_string(),
-            article_id: c.article_id.to_string(),
+            author_name: c.author_name,
             reply_to: c.reply_to.as_ref().map(ObjectId::to_string),
+            reply_to_name: c.reply_to_name,
             created_time: c
                 .created_time
                 .with_timezone(&FixedOffset::east(8 * 3600))
@@ -288,14 +263,12 @@ pub async fn article_details(
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
-    let comment_page_size = 2;
-
     let article_r =
-        db::get_article(id.unwrap(), Some(comment_page_size), comment_page, &pool).await;
+        db::get_article(id.unwrap(), Some(comment_page_size()), comment_page, &pool).await;
 
     match article_r {
         Ok(mut article) => {
-            let author = (&article).author_id.to_string();
+            let author_id = (&article).author_id.to_string();
             let mut articlev: ArticleDetailView = article.into();
             articlev.raw_content = markdown::to_html(articlev.raw_content.as_str());
 
@@ -304,8 +277,8 @@ pub async fn article_details(
             context.insert("article", &articlev);
 
             // 标识是否是当前用户发表的文章，如果是则提供编辑按钮等
-            let username = session.get::<String>("username");
-            if username.is_some() && username.unwrap() == author {
+            let uid = session.get::<String>("uid");
+            if uid.is_some() && uid.unwrap() == author_id {
                 context.insert("is_author", &true);
             }
 
@@ -338,8 +311,8 @@ pub async fn article_details(
 
 #[handler]
 pub async fn publish_article_page(session: &Session) -> impl IntoResponse {
-    match session.get::<String>("username") {
-        Some(_username) => {
+    match session.get::<String>("uid") {
+        Some(_uid) => {
             let mut context = Context::new();
             context.insert("title", "写文章");
             let s = TEMPLATES.render("publish_article.html", &context).unwrap();
@@ -365,9 +338,9 @@ pub async fn publish_article(
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
-    match session.get::<String>("username") {
-        Some(username) => {
-            let author_id = ObjectId::from_str(username.as_str()).unwrap();
+    match session.get::<String>("uid") {
+        Some(uid) => {
+            let author_id = ObjectId::from_str(uid.as_str()).unwrap();
 
             let mut new_article = Article::default();
             new_article.author_id = author_id;
@@ -398,8 +371,8 @@ pub async fn edit_article_page(
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
-    match session.get::<String>("username") {
-        Some(_username) => {
+    match session.get::<String>("uid") {
+        Some(_uid) => {
             let article_r = db::get_article(id.unwrap(), None, None, &pool).await;
 
             match article_r {
@@ -450,8 +423,8 @@ pub async fn edit_article(
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
-    match session.get::<String>("username") {
-        Some(_username) => {
+    match session.get::<String>("uid") {
+        Some(_uid) => {
             let article_r = db::get_article(params.id.clone(), None, None, &pool).await;
 
             match article_r {
@@ -504,8 +477,8 @@ pub async fn new_comment_page(
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
-    match session.get::<String>("username") {
-        Some(_username) => {
+    match session.get::<String>("uid") {
+        Some(_uid) => {
             let article_r = db::get_article(article_id, None, None, &pool).await;
 
             match article_r {
@@ -560,9 +533,22 @@ pub async fn new_comment(
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
-    match session.get::<String>("username") {
-        Some(username) => {
-            let comment = Comment::new(content, article_id.clone(), username, reply_to);
+    match session.get::<String>("uid") {
+        Some(uid) => {
+            let reply_to_name = match reply_to.clone() {
+                Some(to) => {
+                    let u = db::find_user_by_id(to.as_str(), &pool).await.unwrap();
+                    Some(u.username)
+                }
+                None => None,
+            };
+            let comment = Comment::new(
+                content,
+                uid,
+                session.get::<String>("username").unwrap(),
+                reply_to,
+                reply_to_name,
+            );
             let _r = db::append_comment(article_id.clone(), comment, &pool)
                 .await
                 .unwrap();
@@ -577,4 +563,8 @@ pub async fn new_comment(
             .header(header::LOCATION, "/signin")
             .finish(),
     }
+}
+
+fn comment_page_size() ->i32{
+    20
 }

@@ -1,5 +1,4 @@
 use chrono::prelude::*;
-use futures::stream::TryStreamExt;
 use futures::StreamExt;
 use poem::Result;
 use std::{ops::SubAssign, str::FromStr};
@@ -71,9 +70,10 @@ pub async fn append_comment(
         "$push":{
             "comments":{
                 "content": comment.content,
-                "article_id": comment.article_id,
                 "author_id": comment.author_id,
+                "author_name": comment.author_name,
                 "reply_to": comment.reply_to,
+                "reply_to_name": comment.reply_to_name,
                 "created_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
                 "updated_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
                 "status": comment.status as i32,
@@ -111,6 +111,12 @@ pub async fn get_article(
             "$match":{"_id":ObjectId::from_str(article_id.as_str()).unwrap()},
         },
         doc! {
+            "$lookup":{"from":"user","localField":"author_id","foreignField":"_id","as":"fromAuthors"},
+        },
+        doc! {
+            "$unwind":"$fromAuthors",
+        },
+        doc! {
             "$project":{
                 "_id":1,
                 "title":1,
@@ -122,6 +128,7 @@ pub async fn get_article(
                 "status":1,
                 "comments":{"$slice":vec![bson!("$comments"), bson!(comment_page.clone() * comment_page_size.clone()), bson!(comment_page_size.clone())]},
                 "total_comments":{"$size": {"$ifNull": vec![bson!("$comments"), bson!(Vec::<i32>::new())]}},
+                "author_name":"$fromAuthors.username",
             },
         },
     ];
@@ -147,6 +154,12 @@ pub async fn list_article(mongo: &Database) -> Result<Vec<Article>> {
             "$match":{},
         },
         doc! {
+            "$lookup":{"from":"user","localField":"author_id","foreignField":"_id","as":"fromAuthors"},
+        },
+        doc! {
+            "$unwind":"$fromAuthors",
+        },
+        doc! {
             "$project":{
                 "_id":1,
                 "title":1,
@@ -157,6 +170,7 @@ pub async fn list_article(mongo: &Database) -> Result<Vec<Article>> {
                 "updated_time":1,
                 "status":1,
                 "total_comments":{"$size": {"$ifNull": vec![bson!("$comments"), bson!(Vec::<i32>::new())]}},
+                "author_name":"$fromAuthors.username",
             },
         },
     ];
@@ -182,6 +196,21 @@ pub async fn find_user_by_giteeid(mongo: &Database, id: i64) -> Result<User> {
     let user = mongo
         .collection::<User>("user")
         .find_one(doc! {"inner.id":id}, None)
+        .await
+        .map_err(poem::error::InternalServerError)?;
+
+    match user {
+        Some(user) => Ok(user),
+        None => Err(poem::error::NotFoundError.into()),
+    }
+}
+
+pub async fn find_user_by_id(id: &str, mongo: &Database) -> Result<User> {
+    info!("find_user_by_id : {}", id);
+    let oid = ObjectId::from_str(id).unwrap();
+    let user = mongo
+        .collection::<User>("user")
+        .find_one(doc! {"_id":oid}, None)
         .await
         .map_err(poem::error::InternalServerError)?;
 
