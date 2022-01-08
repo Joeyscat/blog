@@ -2,7 +2,7 @@ use chrono::prelude::*;
 use futures::stream::TryStreamExt;
 use futures::StreamExt;
 use poem::Result;
-use std::{str::FromStr, ops::SubAssign};
+use std::{ops::SubAssign, str::FromStr};
 
 use mongodb::{
     bson::{bson, doc, oid::ObjectId},
@@ -121,7 +121,7 @@ pub async fn get_article(
                 "updated_time":1,
                 "status":1,
                 "comments":{"$slice":vec![bson!("$comments"), bson!(comment_page.clone() * comment_page_size.clone()), bson!(comment_page_size.clone())]},
-                "total_comments":{"$size":vec![bson!("$comments")]},
+                "total_comments":{"$size": {"$ifNull": vec![bson!("$comments"), bson!(Vec::<i32>::new())]}},
             },
         },
     ];
@@ -142,14 +142,37 @@ pub async fn get_article(
 }
 
 pub async fn list_article(mongo: &Database) -> Result<Vec<Article>> {
-    let cursor: mongodb::Cursor<Article> = mongo
+    let pipeline = vec![
+        doc! {
+            "$match":{},
+        },
+        doc! {
+            "$project":{
+                "_id":1,
+                "title":1,
+                "raw_content":1,
+                "tags":1,
+                "author_id":1,
+                "created_time":1,
+                "updated_time":1,
+                "status":1,
+                "total_comments":{"$size": {"$ifNull": vec![bson!("$comments"), bson!(Vec::<i32>::new())]}},
+            },
+        },
+    ];
+    let mut cursor = mongo
         .collection::<Article>("article")
-        .find(doc! {}, None)
+        .aggregate(pipeline, None)
         .await
         .map_err(poem::error::InternalServerError)?;
 
-    let result: Vec<Article> = cursor.try_collect().await.unwrap();
+    let mut result = Vec::new();
+    while let Some(c) = cursor.next().await {
+        let article: Article = bson::from_document(c.map_err(poem::error::InternalServerError)?)
+            .map_err(poem::error::InternalServerError)?;
 
+        result.push(article);
+    }
     Ok(result)
 }
 
