@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use poem::{
+    endpoint::StaticFiles,
     get,
     listener::TcpListener,
     session::{CookieConfig, CookieSession},
@@ -54,6 +55,11 @@ async fn main() -> Result<(), std::io::Error> {
             "/article/edit",
             get(handler::edit_article_page).post(handler::edit_article),
         )
+        .at(
+            "/comment/new",
+            get(handler::new_comment_page).post(handler::new_comment),
+        )
+        .nest("/assets", StaticFiles::new("./assets").show_files_listing())
         .with(CookieSession::new(CookieConfig::default().secure(false)))
         .data(mongodb)
         .around(middleware::log);

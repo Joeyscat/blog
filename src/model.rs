@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc, MIN_DATETIME};
 use mongodb::bson::oid::ObjectId;
 use mongodb::bson::Document;
 use serde_derive::{Deserialize, Serialize};
+use std::str::FromStr;
 
 ///
 /// Model: Article
@@ -20,6 +21,7 @@ pub struct Article {
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub updated_time: DateTime<Utc>,
     pub status: i16,
+    pub comments: Option<Vec<Comment>>,
 }
 
 impl Default for Article {
@@ -31,7 +33,46 @@ impl Default for Article {
             tags: Default::default(),
             author_id: Default::default(),
             created_time: Utc::now(),
-            updated_time: MIN_DATETIME,
+            updated_time: Utc::now(),
+            status: 1,
+            comments: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    pub content: String,
+    pub author_id: ObjectId,
+    pub article_id: ObjectId,
+    pub reply_to: Option<ObjectId>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
+    pub created_time: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
+    pub updated_time: DateTime<Utc>,
+    pub status: i16,
+}
+
+impl Comment {
+    pub fn new(
+        content: String,
+        article_id: String,
+        author_id: String,
+        reply_to: Option<String>,
+    ) -> Self {
+        let article_id = ObjectId::from_str(article_id.as_str()).unwrap();
+        let author_id = ObjectId::from_str(author_id.as_str()).unwrap();
+        let reply_to = reply_to
+            .as_ref()
+            .map(|s| ObjectId::from_str(s.as_str()).unwrap());
+
+        Self {
+            content,
+            article_id,
+            author_id,
+            reply_to,
+            created_time: Utc::now(),
+            updated_time: Utc::now(),
             status: 1,
         }
     }

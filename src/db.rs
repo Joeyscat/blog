@@ -9,7 +9,7 @@ use mongodb::{
 use tracing::{debug, info};
 
 use crate::gitee;
-use crate::model::{Article, User};
+use crate::model::{Article, Comment, User};
 
 pub async fn create_article(article: Article, mongo: &Database) -> Result<String> {
     let now = Utc::now().with_timezone(&FixedOffset::east(8 * 3600));
@@ -49,7 +49,37 @@ pub async fn update_article(article: Article, mongo: &Database) -> Result<bool> 
         }
     };
 
-    info!("update article: query={:?}, update={:?}", query, update);
+    let matched_count = mongo
+        .collection::<Article>("article")
+        .update_one(query, update, None)
+        .await
+        .map_err(poem::error::InternalServerError)?
+        .matched_count;
+
+    Ok(matched_count > 0)
+}
+
+pub async fn append_comment(
+    article_id: String,
+    comment: Comment,
+    mongo: &Database,
+) -> Result<bool> {
+    let query = doc! {"_id":ObjectId::from_str(article_id.as_str()).unwrap()};
+    let update = doc! {
+        "$push":{
+            "comments":{
+                "content": comment.content,
+                "article_id": comment.article_id,
+                "author_id": comment.author_id,
+                "reply_to": comment.reply_to,
+                "created_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
+                "updated_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
+                "status": comment.status as i32,
+            },
+        }
+    };
+
+    debug!("append comment: query={:?}, update={:?}", query, update);
 
     let matched_count = mongo
         .collection::<Article>("article")
@@ -62,7 +92,6 @@ pub async fn update_article(article: Article, mongo: &Database) -> Result<bool> 
 }
 
 pub async fn get_article(article_id: String, mongo: &Database) -> Result<Article> {
-    info!("get article: {}", article_id);
     let oid = ObjectId::from_str(article_id.as_str()).unwrap();
     let article = mongo
         .collection::<Article>("article")
@@ -70,9 +99,11 @@ pub async fn get_article(article_id: String, mongo: &Database) -> Result<Article
         .await
         .map_err(poem::error::InternalServerError)?;
 
-    debug!("get article result: {:?}", article);
     match article {
-        Some(article) => Ok(article),
+        Some(article) => {
+            debug!("get article result: {}", article.title);
+            Ok(article)
+        }
         None => Err(poem::error::NotFoundError.into()),
     }
 }

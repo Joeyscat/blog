@@ -20,5 +20,44 @@
     </div>
 
     <div class="detail-body">{{article.raw_content|safe}}</div>
+
+    <div class="comments">
+        <div class="">
+            <h3 class="left">评论区</h3>
+            <a class="right new-comment" href="/comment/new?article_id={{article.id}}">写评论</a>
+            <div style="clear:both;"></div>
+        </div>
+
+        {% for comment in article.comments %}
+        <div class="item">
+            <div class="comment-title">
+                <a class="author-name" href="#">{{comment.author_id}}</a>
+                {% if comment.reply_to %}
+                回复&nbsp;
+                <a class="author-name" href="#">{{comment.reply_to}}</a>
+                &nbsp;
+                {% endif %}
+                <span class="created-time">{{comment.created_time}}</span>
+                &nbsp;
+                <a class="reply" href="/comment/new?article_id={{article.id}}&reply_to={{comment.author_id}}">回复</a>
+            </div>
+            <div class="comment-content">
+                <p>{{comment.content}}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="comment_paginator_part">
+        <div class="comment_paginator right">
+
+            <a href="/article?id=d88e263e-0dc9-428f-8451-22721fb8f35c&amp;current_page=1" class="current_page">
+                1
+            </a>
+
+            共 2 条评论, 1 页
+        </div>
+        <div style="clear:both;"></div>
+    </div>
 </div>
 {% endblock %}

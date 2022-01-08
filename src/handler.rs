@@ -14,9 +14,9 @@ use std::str::FromStr;
 use tera::{Context, Tera};
 use tracing::info;
 
-use crate::db;
 use crate::gitee;
 use crate::model::Article;
+use crate::{db, model::Comment};
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
@@ -186,6 +186,18 @@ pub struct ArticleDetailView {
     pub created_time: String,
     // pub updated_time: String,
     pub status: i16,
+    pub comments: Vec<CommentView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+
+pub struct CommentView {
+    pub content: String,
+    pub author_id: String,
+    pub article_id: String,
+    pub reply_to: Option<String>,
+    pub created_time: String,
+    pub status: i16,
 }
 
 #[handler]
@@ -220,6 +232,11 @@ pub struct FindArticle {
 
 impl From<Article> for ArticleDetailView {
     fn from(a: Article) -> Self {
+        let comments = match a.comments {
+            Some(cs) => cs.into_iter().map(|c| c.into()).collect(),
+            None => Vec::new(),
+        };
+
         ArticleDetailView {
             id: a.id.to_string(),
             title: a.title,
@@ -232,9 +249,28 @@ impl From<Article> for ArticleDetailView {
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string(),
             status: a.status,
+            comments,
         }
     }
 }
+
+impl From<Comment> for CommentView {
+    fn from(c: Comment) -> Self {
+        CommentView {
+            content: c.content,
+            author_id: c.author_id.to_string(),
+            article_id: c.article_id.to_string(),
+            reply_to: c.reply_to.as_ref().map(ObjectId::to_string),
+            created_time: c
+                .created_time
+                .with_timezone(&FixedOffset::east(8 * 3600))
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string(),
+            status: c.status,
+        }
+    }
+}
+
 #[handler]
 pub async fn article_details(
     Query(FindArticle { id, title: _ }): Query<FindArticle>,
@@ -419,6 +455,96 @@ pub async fn edit_article(
                     Html(s).into_response()
                 }
             }
+        }
+        None => Response::builder()
+            .status(StatusCode::FOUND)
+            .header(header::LOCATION, "/signin")
+            .finish(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct NewCommentPageReq {
+    article_id: String,
+    reply_to: Option<String>,
+}
+
+#[handler]
+pub async fn new_comment_page(
+    Query(NewCommentPageReq {
+        article_id,
+        reply_to,
+    }): Query<NewCommentPageReq>,
+    session: &Session,
+    pool: Data<&Database>,
+) -> impl IntoResponse {
+    match session.get::<String>("username") {
+        Some(_username) => {
+            let article_r = db::get_article(article_id, &pool).await;
+
+            match article_r {
+                Ok(article) => {
+                    let articlev: ArticleDetailView = article.into();
+                    let title = format!("评论: {}", &articlev.title.as_str());
+                    let mut context = Context::new();
+                    context.insert("title", &title);
+                    context.insert("reply_to", &reply_to);
+                    context.insert("article", &articlev);
+
+                    let s = TEMPLATES.render("new_comment.html", &context).unwrap();
+                    Html(s).into_response()
+                }
+                Err(err) => {
+                    let mut context = Context::new();
+
+                    if err.to_string().contains("no rows returned") {
+                        context.insert("title", "404");
+                        let s = TEMPLATES.render("404.html", &context).unwrap();
+                        return Html(s).into_response();
+                    }
+
+                    context.insert("title", "错误");
+                    context.insert("msg", &err.to_string());
+                    let s = TEMPLATES.render("error.html", &context).unwrap();
+                    Html(s).into_response()
+                }
+            }
+        }
+        None => Response::builder()
+            .status(StatusCode::FOUND)
+            .header(header::LOCATION, "/signin")
+            .finish(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CommentArticleParams {
+    reply_to: Option<String>,
+    article_id: String,
+    content: String,
+}
+
+#[handler]
+pub async fn new_comment(
+    Form(CommentArticleParams {
+        reply_to,
+        article_id,
+        content,
+    }): Form<CommentArticleParams>,
+    session: &Session,
+    pool: Data<&Database>,
+) -> impl IntoResponse {
+    match session.get::<String>("username") {
+        Some(username) => {
+            let comment = Comment::new(content, article_id.clone(), username, reply_to);
+            let _r = db::append_comment(article_id.clone(), comment, &pool)
+                .await
+                .unwrap();
+
+            Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, format!("/article?id={}", article_id))
+                .finish()
         }
         None => Response::builder()
             .status(StatusCode::FOUND)

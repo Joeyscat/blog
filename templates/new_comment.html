@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+<div class="body-content">
+    <h3>
+        新评论
+    </h3>
+    <p class="new-reply">对如下文章进行回复:<br>
+        <span class="article-title">{{article.title}}</span>
+    </p>
+    <form class="" action="/comment/new" method="post">
+        <input type="hidden" name="article_id" value="{{article.id}}">
+        {% if reply_to %}
+        <input type="hidden" name="reply_to" value="{{reply_to}}">
+        {% endif %}
+        <textarea name="content" placeholder="这里输入内容" autofocus="">
+        </textarea>
+        <br>
+        <input type="submit" value="发布">
+    </form>
+</div>
+{% endblock content %}
