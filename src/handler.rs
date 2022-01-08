@@ -187,6 +187,8 @@ pub struct ArticleDetailView {
     // pub updated_time: String,
     pub status: i16,
     pub comments: Vec<CommentView>,
+    pub total_comments: i32,
+    pub comment_page_nums: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -227,7 +229,7 @@ pub async fn index(_session: &Session, pool: Data<&Database>) -> impl IntoRespon
 #[derive(Deserialize)]
 pub struct FindArticle {
     id: Option<String>,
-    title: Option<String>,
+    comment_page: Option<i32>,
 }
 
 impl From<Article> for ArticleDetailView {
@@ -236,7 +238,14 @@ impl From<Article> for ArticleDetailView {
             Some(cs) => cs.into_iter().map(|c| c.into()).collect(),
             None => Vec::new(),
         };
-
+        let mut comment_page_nums = vec![1];
+        let comment_page_size = 2;
+        if a.total_comments.is_some() {
+            let pages = (a.total_comments.unwrap() as f32 / comment_page_size as f32).ceil() as i32;
+            for i in 2..pages+1 {
+                comment_page_nums.push(i);
+            }
+        }
         ArticleDetailView {
             id: a.id.to_string(),
             title: a.title,
@@ -250,6 +259,8 @@ impl From<Article> for ArticleDetailView {
                 .to_string(),
             status: a.status,
             comments,
+            total_comments: a.total_comments.unwrap(),
+            comment_page_nums,
         }
     }
 }
@@ -273,11 +284,14 @@ impl From<Comment> for CommentView {
 
 #[handler]
 pub async fn article_details(
-    Query(FindArticle { id, title: _ }): Query<FindArticle>,
+    Query(FindArticle { id, comment_page }): Query<FindArticle>,
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
-    let article_r = db::get_article(id.unwrap(), &pool).await;
+    let comment_page_size = 2;
+
+    let article_r =
+        db::get_article(id.unwrap(), Some(comment_page_size), comment_page, &pool).await;
 
     match article_r {
         Ok(mut article) => {
@@ -289,10 +303,19 @@ pub async fn article_details(
             context.insert("title", &articlev.title);
             context.insert("article", &articlev);
 
+            // 标识是否是当前用户发表的文章，如果是则提供编辑按钮等
             let username = session.get::<String>("username");
             if username.is_some() && username.unwrap() == author {
                 context.insert("is_author", &true);
             }
+
+            // 评论分页
+            let mut cp = 1;
+            if comment_page.is_some() {
+                cp = comment_page.unwrap();
+            }
+            context.insert("comment_current_page", &cp);
+
             let s = TEMPLATES.render("article.html", &context).unwrap();
             Html(s).into_response()
         }
@@ -368,13 +391,16 @@ pub async fn publish_article(
 
 #[handler]
 pub async fn edit_article_page(
-    Query(FindArticle { id, title: _ }): Query<FindArticle>,
+    Query(FindArticle {
+        id,
+        comment_page: _,
+    }): Query<FindArticle>,
     session: &Session,
     pool: Data<&Database>,
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
-            let article_r = db::get_article(id.unwrap(), &pool).await;
+            let article_r = db::get_article(id.unwrap(), None, None, &pool).await;
 
             match article_r {
                 Ok(article) => {
@@ -426,7 +452,7 @@ pub async fn edit_article(
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
-            let article_r = db::get_article(params.id.clone(), &pool).await;
+            let article_r = db::get_article(params.id.clone(), None, None, &pool).await;
 
             match article_r {
                 Ok(mut article) => {
@@ -480,7 +506,7 @@ pub async fn new_comment_page(
 ) -> impl IntoResponse {
     match session.get::<String>("username") {
         Some(_username) => {
-            let article_r = db::get_article(article_id, &pool).await;
+            let article_r = db::get_article(article_id, None, None, &pool).await;
 
             match article_r {
                 Ok(article) => {

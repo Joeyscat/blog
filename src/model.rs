@@ -22,6 +22,7 @@ pub struct Article {
     pub updated_time: DateTime<Utc>,
     pub status: i16,
     pub comments: Option<Vec<Comment>>,
+    pub total_comments: Option<i32>,
 }
 
 impl Default for Article {
@@ -36,6 +37,7 @@ impl Default for Article {
             updated_time: Utc::now(),
             status: 1,
             comments: None,
+            total_comments: None,
         }
     }
 }
@@ -134,5 +136,28 @@ mod tests {
 
         let dd = mongodb::bson::Bson::DateTime(now_east_8.into());
         println!("dd:\t{}", dd);
+    }
+
+    #[test]
+    fn test_div() {
+        let d = (8 as f32 / 3 as f32).ceil() as i32;
+        println!("{}",d);
+
+        let mut v = vec![1];
+        for i in 2..d + 1 {
+            v.push(i);
+        }
+
+        println!("{:?}", v);
+
+        let d = (8 as f32 / 2 as f32).ceil() as i32;
+        println!("{}",d);
+
+        let mut v = vec![1];
+        for i in 2..d + 1 {
+            v.push(i);
+        }
+
+        println!("{:?}", v);
     }
 }

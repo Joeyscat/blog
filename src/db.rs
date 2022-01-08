@@ -1,9 +1,11 @@
 use chrono::prelude::*;
+use futures::stream::TryStreamExt;
+use futures::StreamExt;
 use poem::Result;
-use std::str::FromStr;
+use std::{str::FromStr, ops::SubAssign};
 
 use mongodb::{
-    bson::{doc, oid::ObjectId},
+    bson::{bson, doc, oid::ObjectId},
     Database,
 };
 use tracing::{debug, info};
@@ -91,24 +93,53 @@ pub async fn append_comment(
     Ok(matched_count > 0)
 }
 
-pub async fn get_article(article_id: String, mongo: &Database) -> Result<Article> {
-    let oid = ObjectId::from_str(article_id.as_str()).unwrap();
-    let article = mongo
+pub async fn get_article(
+    article_id: String,
+    mut comment_page_size: Option<i32>,
+    mut comment_page: Option<i32>,
+    mongo: &Database,
+) -> Result<Article> {
+    let comment_page_size = comment_page_size.get_or_insert(1); // Third argument to $slice must be positive: 0)
+    let comment_page = comment_page.get_or_insert(0);
+    if comment_page > &mut 0 {
+        comment_page.sub_assign(1);
+    }
+
+    // db.article.aggregate([{$match:{_id: ObjectId("61d70cfa4a138b2ed4f4b088")}}, {$project: {comments:{$slice:["$comments",2,1]}}}]);
+    let pipeline = vec![
+        doc! {
+            "$match":{"_id":ObjectId::from_str(article_id.as_str()).unwrap()},
+        },
+        doc! {
+            "$project":{
+                "_id":1,
+                "title":1,
+                "raw_content":1,
+                "tags":1,
+                "author_id":1,
+                "created_time":1,
+                "updated_time":1,
+                "status":1,
+                "comments":{"$slice":vec![bson!("$comments"), bson!(comment_page.clone() * comment_page_size.clone()), bson!(comment_page_size.clone())]},
+                "total_comments":{"$size":vec![bson!("$comments")]},
+            },
+        },
+    ];
+    let mut cursor = mongo
         .collection::<Article>("article")
-        .find_one(doc! {"_id":oid}, None)
+        .aggregate(pipeline, None)
         .await
         .map_err(poem::error::InternalServerError)?;
 
-    match article {
-        Some(article) => {
-            debug!("get article result: {}", article.title);
-            Ok(article)
-        }
-        None => Err(poem::error::NotFoundError.into()),
+    if let Some(c) = cursor.next().await {
+        let article: Article = bson::from_document(c.map_err(poem::error::InternalServerError)?)
+            .map_err(poem::error::InternalServerError)?;
+        debug!("get article result: {}", article.title);
+        Ok(article)
+    } else {
+        Err(poem::error::NotFoundError.into())
     }
 }
-
-use futures::stream::TryStreamExt;
 
 pub async fn list_article(mongo: &Database) -> Result<Vec<Article>> {
     let cursor: mongodb::Cursor<Article> = mongo

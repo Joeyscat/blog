@@ -50,12 +50,12 @@
 
     <div class="comment_paginator_part">
         <div class="comment_paginator right">
-
-            <a href="/article?id=d88e263e-0dc9-428f-8451-22721fb8f35c&amp;current_page=1" class="current_page">
-                1
+            {% for comment_page in article.comment_page_nums %}
+            <a href="/article?id={{article.id}}&comment_page={{comment_page}}" class="current_page">
+                {{comment_page}}&nbsp;
             </a>
-
-            共 2 条评论, 1 页
+            {% endfor %}
+            共 {{article.total_comments}} 条评论, {{comment_current_page}} 页
         </div>
         <div style="clear:both;"></div>
     </div>
