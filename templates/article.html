@@ -21,7 +21,7 @@
 
     <div class="detail-body">{{article.raw_content|safe}}</div>
 
-    <div class="comments">
+    <div class="comments" id="comments">
         <div class="">
             <h3 class="left">评论区</h3>
             <a class="right new-comment" href="/comment/new?article_id={{article.id}}">写评论</a>
@@ -51,11 +51,18 @@
     <div class="comment_paginator_part">
         <div class="comment_paginator right">
             {% for comment_page in article.comment_page_nums %}
-            <a href="/article?id={{article.id}}&comment_page={{comment_page}}" class="current_page">
-                {{comment_page}}&nbsp;
+            {% if comment_page == comment_current_page %}
+            <a href="/article?id={{article.id}}&comment_page={{comment_page}}#comments" class="current_page">
+                {{comment_page}}
             </a>
+            {% else %}
+            <a href="/article?id={{article.id}}&comment_page={{comment_page}}#comments">
+                {{comment_page}}
+            </a>
+            {% endif %}
+            &nbsp;
             {% endfor %}
-            共 {{article.total_comments}} 条评论, {{comment_current_page}} 页
+            共 {{article.total_comments}} 条评论, {{article.comment_page_nums|length}} 页
         </div>
         <div style="clear:both;"></div>
     </div>
