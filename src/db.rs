@@ -69,14 +69,17 @@ pub async fn append_comment(
     let update = doc! {
         "$push":{
             "comments":{
-                "content": comment.content,
-                "author_id": comment.author_id,
-                "author_name": comment.author_name,
-                "reply_to": comment.reply_to,
-                "reply_to_name": comment.reply_to_name,
-                "created_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
-                "updated_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
-                "status": comment.status as i32,
+                "$each": [{
+                    "content": comment.content,
+                    "author_id": comment.author_id,
+                    "author_name": comment.author_name,
+                    "reply_to": comment.reply_to,
+                    "reply_to_name": comment.reply_to_name,
+                    "created_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
+                    "updated_time": Utc::now().with_timezone(&FixedOffset::east(8 * 3600)),
+                    "status": comment.status as i32,
+                }],
+                "$position": 0
             },
         }
     };

@@ -14,3 +14,30 @@ db.article.updateMany(
     ]
   }
 )
+
+db.article.aggregate(
+  {
+    $match: { comments: { $exists: true, $ne: [] } }
+  },
+  {
+    $project: {
+      "comments": {
+        "$reverseArray": "$comments"
+      }
+    }
+  },
+  {
+    $merge: {
+      into: "new_article_0112",
+      on: "comments",
+      whenMatched: "replace",
+      whenNotMatched: "fail"
+    }
+  }
+)
+
+// 评论重新排序
+db.article.find().forEach(function (doc) {
+  var comments = doc.comments.reverse();
+  db.article.updateOne({_id: doc._id}, { $set: { comments: comments } });
+})
